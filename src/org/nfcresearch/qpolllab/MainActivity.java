@@ -127,11 +127,12 @@ public final class MainActivity extends Activity {
         imageInfo=text("正在生成预览…",12,0xff52635d);page.addView(imageInfo);
         page.addView(action("四色转换与效果预览",v->showConversion()));
         section(page,"编辑图片");
+        page.addView(action("编辑图片 · 亮度 / 对比度 / 镜像 / 裁剪",v->showEditor(false)));
         LinearLayout options=new LinearLayout(this);options.setGravity(android.view.Gravity.CENTER_VERTICAL);
         fit=spinner(new String[]{"完整显示 · 留白","填满屏幕 · 裁剪"});options.addView(fit,new LinearLayout.LayoutParams(0,dp(48),1));
         options.addView(action("旋转 90°",v->{rotation=(rotation+90)%360;prepare();}),weighted());page.addView(options);
         LinearLayout cropActions=new LinearLayout(this);
-        cropActions.addView(action("裁切图片",v->showCrop()),weighted());
+        cropActions.addView(action("裁剪图片",v->showEditor(true)),weighted());
         cropActions.addView(action("还原原图",v->{if(originalSource!=null){source=originalSource;rotation=0;cropped=false;prepare();}}),weighted());page.addView(cropActions);
         binary=new CheckBox(this);binary.setText("黑白二值化");binary.setChecked(getSharedPreferences("refresh-settings",MODE_PRIVATE).getBoolean("binary",false));idleControls.add(binary);page.addView(binary);
         int savedThreshold=getSharedPreferences("refresh-settings",MODE_PRIVATE).getInt("threshold",128);
@@ -203,15 +204,16 @@ public final class MainActivity extends Activity {
         }
     }
     private void showConversion(){
-        if(source==null||prepared==null||busy||preparing||editingCrop)return;
+        if(source==null||prepared==null||busy||preparing||editingCrop||destroyed)return;
         editingCrop=true;controls();
         ColorConversionDialog dialog=new ColorConversionDialog(this,source,rotation,fit.getSelectedItemPosition()==1,cropped,selectedPanelType(),prepared,
                 binary.isChecked(),dither.isChecked(),blockSizes[blocks.getSelectedItemPosition()],threshold.getProgress(),protectGrays.isChecked(),
                 (mono,noise,size,level,gray)->{
+                    if(destroyed)return;
                     binary.setChecked(mono);threshold.setProgress(level);protectGrays.setChecked(gray);
                     int index=0;for(int i=0;i<blockSizes.length;i++)if(blockSizes[i]==size)index=i;blocks.setSelection(index);dither.setChecked(noise);
                     getSharedPreferences("refresh-settings",MODE_PRIVATE).edit().putBoolean("binary",mono).putBoolean("dither",noise).putInt("blockSize",size).putInt("threshold",level).putBoolean("protectGrays",gray).apply();prepare();
-                },()->{editingCrop=false;previewDialog=null;if(!destroyed)controls();});
+                },()->{editingCrop=false;previewDialog=null;if(!destroyed)controls();},()->showEditor(false));
         previewDialog=dialog;dialog.show();
     }
     @Override protected void onActivityResult(int request,int result,Intent data){
@@ -230,19 +232,15 @@ public final class MainActivity extends Activity {
         LinearLayout actions=new LinearLayout(this);Button fitButton=button("适应屏幕"),actual=button("1:1 像素"),close=button("关闭");fitButton.setOnClickListener(v->viewer.fit());actual.setOnClickListener(v->viewer.actual());close.setOnClickListener(v->dialog.dismiss());actions.addView(fitButton,weighted());actions.addView(actual,weighted());actions.addView(close,weighted());content.addView(actions);
         dialog.setContentView(content);dialog.show();dialog.getWindow().setLayout(-1,-1);
     }
-    private void showCrop(){
-        if(source==null||busy||preparing||editingCrop)return;
+    private void showEditor(boolean startCrop){
+        if(source==null||busy||preparing||editingCrop||destroyed)return;
         try {
-            final CropView cropView=new CropView(this,PanelImage.rotated(source,rotation));
-            LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(12),0,dp(12),0);
-            content.addView(text("单指拖动，双指缩放；白框内为保留区域。",13,0xff52635d));
-            content.addView(cropView,new LinearLayout.LayoutParams(-1,Math.min(dp(380),getResources().getDisplayMetrics().heightPixels/2)));
             editingCrop=true;controls();
-            AlertDialog dialog=new AlertDialog.Builder(this).setTitle("裁切图片 · 屏幕比例").setView(content).setNegativeButton("取消",null).setNeutralButton("重置裁切",null).setPositiveButton("应用裁切",null).create();
-            dialog.setOnDismissListener(d->{editingCrop=false;if(!destroyed)controls();});dialog.show();
-            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->cropView.reset());
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{try{Bitmap result=cropView.result();source=result;rotation=0;cropped=true;dialog.dismiss();fit.setSelection(1);prepare();}catch(Exception e){Toast.makeText(this,"裁切失败："+e.getMessage(),Toast.LENGTH_LONG).show();}});
-        }catch(Exception e){editingCrop=false;controls();Toast.makeText(this,"无法打开裁切："+e.getMessage(),Toast.LENGTH_LONG).show();}
+            ImageEditDialog dialog=new ImageEditDialog(this,PanelImage.rotated(source,rotation),startCrop,(image,hasCrop)->{
+                if(destroyed)return;source=image;rotation=0;cropped=cropped||hasCrop;openConversionAfterLoad=true;if(hasCrop)fit.setSelection(1);prepare();
+            },()->{editingCrop=false;previewDialog=null;if(!destroyed)controls();});
+            previewDialog=dialog;dialog.show();
+        }catch(Exception e){editingCrop=false;controls();Toast.makeText(this,"无法打开编辑："+e.getMessage(),Toast.LENGTH_LONG).show();}
     }
     private void confirmRefresh(){
         if(busy||preparing||prepared==null)return;

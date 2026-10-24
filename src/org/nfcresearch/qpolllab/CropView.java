@@ -6,8 +6,8 @@ import android.view.*;
 
 /** Move the source beneath a fixed panel-aspect crop frame. */
 public final class CropView extends View {
-    private final Bitmap image;
-    private final CropWindow crop;
+    private Bitmap image;
+    private CropWindow crop;
     private final RectF frame=new RectF();
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
     private final ScaleGestureDetector detector;
@@ -41,6 +41,10 @@ public final class CropView extends View {
     }
     @Override public boolean performClick(){super.performClick();return true;}
     public void reset(){crop.reset();invalidate();}
+    public void setImage(Bitmap image,boolean reset){
+        if(reset||this.image.getWidth()!=image.getWidth()||this.image.getHeight()!=image.getHeight())crop=new CropWindow(image.getWidth(),image.getHeight());
+        this.image=image;invalidate();
+    }
     public Bitmap result(){
         int left=Math.max(0,(int)Math.floor(crop.left())),top=Math.max(0,(int)Math.floor(crop.top()));
         int right=Math.min(image.getWidth(),(int)Math.ceil(crop.left()+crop.width())),bottom=Math.min(image.getHeight(),(int)Math.ceil(crop.top()+crop.height()));

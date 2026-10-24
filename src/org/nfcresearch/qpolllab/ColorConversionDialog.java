@@ -34,7 +34,7 @@ public final class ColorConversionDialog extends Dialog {
     private Runnable pending;
 
     public ColorConversionDialog(Activity activity,Bitmap source,int rotation,boolean cover,boolean cropped,String panel,
-            PanelImage.Prepared initial,boolean binary,boolean dither,int block,int level,boolean protectGrays,Apply onApply,Runnable onClose){
+            PanelImage.Prepared initial,boolean binary,boolean dither,int block,int level,boolean protectGrays,Apply onApply,Runnable onClose,Runnable onEdit){
         super(activity,android.R.style.Theme_Material_Light_NoActionBar);
         this.source=source;this.rotation=rotation;this.cover=cover;this.cropped=cropped;this.panel=panel;
         original=PanelImage.fitted(source,rotation,cover);converted=initial.preview;
@@ -47,6 +47,7 @@ public final class ColorConversionDialog extends Dialog {
         Button fit=button("适应屏幕");fit.setOnClickListener(v->preview.fit());viewTools.addView(fit,weighted());
         Button actual=button("1:1 像素");actual.setOnClickListener(v->preview.actual());viewTools.addView(actual,weighted());root.addView(viewTools);
         status=label("正在生成预览…",12);root.addView(status);
+        Button edit=button("编辑 / 裁剪图片");edit.setOnClickListener(v->finish(onEdit));root.addView(edit);
         mode=spinner(new String[]{"四色 · 清晰色块","四色 · 照片抖动","黑白 · 文字","黑白 · 抖动"});mode.setSelection((binary?2:0)+(dither?1:0));root.addView(mode);
         blocks=spinner(new String[]{"细节：原始","细节：2×2 色块","细节：4×4 色块","细节：8×8 色块","细节：16×16 色块"});
         for(int i=0;i<blockSizes.length;i++)if(blockSizes[i]==block)blocks.setSelection(i);root.addView(blocks);
@@ -56,7 +57,7 @@ public final class ColorConversionDialog extends Dialog {
         LinearLayout actions=new LinearLayout(activity);
         Button cancel=button("取消");cancel.setOnClickListener(v->dismiss());actions.addView(cancel,weighted());
         apply=button("应用到发送预览");apply.setTextColor(Color.WHITE);apply.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff176b61));
-        apply.setOnClickListener(v->{boolean mono=mode.getSelectedItemPosition()>=2,noise=mode.getSelectedItemPosition()%2==1;int size=blockSizes[blocks.getSelectedItemPosition()],value=threshold.getProgress();boolean gray=protect.isChecked();dismiss();onApply.apply(mono,noise&&size==1,size,value,gray);});
+        apply.setOnClickListener(v->{boolean mono=mode.getSelectedItemPosition()>=2,noise=mode.getSelectedItemPosition()%2==1;int size=blockSizes[blocks.getSelectedItemPosition()],value=threshold.getProgress();boolean gray=protect.isChecked();finish(()->onApply.apply(mono,noise&&size==1,size,value,gray));});
         actions.addView(apply,new LinearLayout.LayoutParams(0,dp(48),2));root.addView(actions);setContentView(root);
         AdapterView.OnItemSelectedListener selected=new AdapterView.OnItemSelectedListener(){public void onItemSelected(AdapterView<?> p,View v,int pos,long id){if(blocks.getSelectedItemPosition()>0&&mode.getSelectedItemPosition()%2==1){mode.setSelection(mode.getSelectedItemPosition()-1);return;}schedule();}public void onNothingSelected(AdapterView<?> p){}};
         mode.setOnItemSelectedListener(selected);blocks.setOnItemSelectedListener(selected);
@@ -65,6 +66,8 @@ public final class ColorConversionDialog extends Dialog {
         setOnDismissListener(d->{closed=true;revision++;main.removeCallbacksAndMessages(null);worker.shutdownNow();onClose.run();});schedule();
     }
     @Override protected void onStart(){super.onStart();getWindow().setLayout(-1,-1);}
+    // Run after onDismiss releases the activity's editing lock, on a separate handler from preview cleanup.
+    private void finish(Runnable action){dismiss();new Handler(getContext().getMainLooper()).post(action);}
     private void schedule(){
         if(closed)return;
         showOriginal=false;updateImage();
