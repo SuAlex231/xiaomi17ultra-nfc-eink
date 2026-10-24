@@ -5,11 +5,14 @@ public final class ImageRaster {
     private static final int[] COLORS={0xff000000,0xffffffff,0xfff5cd00,0xffc80000};
     public static int color(int code){if(code<0||code>3)throw new IllegalArgumentException("颜色码错误");return COLORS[code];}
     public static byte[] quantize(int[] pixels,int width,int height,boolean binary,int threshold,boolean dither,int block) {
+        return quantize(pixels,width,height,binary,threshold,dither,block,false);
+    }
+    public static byte[] quantize(int[] pixels,int width,int height,boolean binary,int threshold,boolean dither,int block,boolean protectGrays) {
         if(width<=0||height<=0||(long)width*height!=pixels.length||threshold<0||threshold>255)
             throw new IllegalArgumentException("图片参数错误");
         if(block>1) {
             // Binary threshold must be applied after averaging, not to four-color codes.
-            if(!binary)return ImageBlocks.quantize(pixels,width,height,block,COLORS);
+            if(!binary)return ImageBlocks.quantize(pixels,width,height,block,COLORS,protectGrays);
             if(block!=2&&block!=4&&block!=8&&block!=16)throw new IllegalArgumentException("色块参数错误");
             byte[] out=new byte[pixels.length];
             for(int y=0;y<height;y+=block)for(int x=0;x<width;x+=block){
@@ -34,7 +37,8 @@ public final class ImageRaster {
                     float g=clamp(((p>>>8)&255)+(dither?current[1][x+1]:0));
                     float b=clamp((p&255)+(dither?current[2][x+1]:0));
                     float score=Float.MAX_VALUE;
-                    for(int k=0;k<4;k++){int c=COLORS[k];float dr=r-((c>>>16)&255),dg=g-((c>>>8)&255),db=b-(c&255),s=dr*dr+dg*dg+db*db;if(s<score){score=s;best=k;}}
+                    int colors=protectGrays&&isNeutral((p>>>16)&255,(p>>>8)&255,p&255)?2:4;
+                    for(int k=0;k<colors;k++){int c=COLORS[k];float dr=r-((c>>>16)&255),dg=g-((c>>>8)&255),db=b-(c&255),s=dr*dr+dg*dg+db*db;if(s<score){score=s;best=k;}}
                     if(dither){int c=COLORS[best];spread(current[0],next[0],x,r-((c>>>16)&255));spread(current[1],next[1],x,g-((c>>>8)&255));spread(current[2],next[2],x,b-(c&255));}
                 }
                 codes[index]=(byte)best;
@@ -43,6 +47,7 @@ public final class ImageRaster {
         }
         return codes;
     }
+    public static boolean isNeutral(float r,float g,float b){return Math.max(r,Math.max(g,b))-Math.min(r,Math.min(g,b))<=18;}
     private static float luma(int p){return (299*((p>>>16)&255)+587*((p>>>8)&255)+114*(p&255))/1000f;}
     private static float clamp(float value){return Math.max(0,Math.min(255,value));}
     private static void spread(float[] current,float[] next,int x,float error){current[x+2]+=error*7/16;next[x]+=error*3/16;next[x+1]+=error*5/16;next[x+2]+=error/16;}

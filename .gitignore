@@ -8,3 +8,8 @@ __pycache__/
 .env.*
 *.log
 /local.properties
+
+# Local one-off device preparation helpers (not part of the release source)
+/tools/
+/diagnostics/
+*.idsig

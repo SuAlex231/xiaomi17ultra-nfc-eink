@@ -52,7 +52,7 @@ public final class PanelImage {
     public static Bitmap testPattern() {
         Bitmap b=Bitmap.createBitmap(552,768,Bitmap.Config.ARGB_8888);Canvas c=new Canvas(b);c.drawColor(Color.WHITE);
         Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setColor(Color.BLACK);p.setTextSize(44);p.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        c.drawText("NFC 刷新测试",44,85,p);p.setTextSize(27);c.drawText("SN220U / Q-Poll",44,132,p);
+        c.drawText("NFC 刷新测试",44,85,p);p.setTextSize(27);c.drawText(StPolling.supportedDevice(android.os.Build.DEVICE,android.os.Build.VERSION.SDK_INT)?"Xiaomi 17 Ultra / ST54L":"NFC / Q-Poll",44,132,p);
         for(int i=0;i<4;i++){p.setColor(PALETTE[i]);c.drawRect(i*138,180,(i+1)*138,570,p);}
         p.setColor(Color.BLACK);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(4);c.drawRect(3,3,549,765,p);p.setStyle(Paint.Style.FILL);
         p.setTextSize(28);c.drawText("552 × 768",44,640,p);c.drawText("顶部 ↑    黑 白 黄 红",44,690,p);
@@ -63,21 +63,28 @@ public final class PanelImage {
         Matrix rotate=new Matrix();rotate.setRotate(rotation);
         return Bitmap.createBitmap(source,0,0,source.getWidth(),source.getHeight(),rotate,true);
     }
-    public static Prepared prepare(Bitmap source,int rotation,boolean cover,boolean dither,int block,boolean binary,int threshold,boolean cropped,String panelType) {
-        if(block>1)dither=false;
+    public static Bitmap fitted(Bitmap source,int rotation,boolean cover){
         Bitmap input=rotated(source,rotation);
         Bitmap fitted=Bitmap.createBitmap(552,768,Bitmap.Config.ARGB_8888);Canvas canvas=new Canvas(fitted);canvas.drawColor(Color.WHITE);
         float sx=552f/input.getWidth(),sy=768f/input.getHeight(),scale=cover?Math.max(sx,sy):Math.min(sx,sy);
         float w=input.getWidth()*scale,h=input.getHeight()*scale;
         canvas.drawBitmap(input,null,new RectF((552-w)/2,(768-h)/2,(552+w)/2,(768+h)/2),new Paint(Paint.FILTER_BITMAP_FLAG));
+        return fitted;
+    }
+    public static Prepared prepare(Bitmap source,int rotation,boolean cover,boolean dither,int block,boolean binary,int threshold,boolean cropped,String panelType) {
+        return prepare(source,rotation,cover,dither,block,binary,threshold,cropped,panelType,false);
+    }
+    public static Prepared prepare(Bitmap source,int rotation,boolean cover,boolean dither,int block,boolean binary,int threshold,boolean cropped,String panelType,boolean protectGrays) {
+        if(block>1)dither=false;
+        Bitmap fitted=fitted(source,rotation,cover);
         int[] pixels=new int[552*768];
         fitted.getPixels(pixels,0,552,0,0,552,768);
-        byte[] codes=ImageRaster.quantize(pixels,552,768,binary,threshold,dither,block);
+        byte[] codes=ImageRaster.quantize(pixels,552,768,binary,threshold,dither,block,protectGrays);
         // An unselected panel can still preview; sending requires an explicit selection.
         PanelType type=panelType.isEmpty()?PanelType.A1:PanelType.parse(panelType);
         byte[] packed=type.pack(codes);
         Bitmap image=Bitmap.createBitmap(type.preview(packed),552,768,Bitmap.Config.ARGB_8888);
-        String settings="屏幕："+(panelType.isEmpty()?"尚未选择":panelType)+" · "+(binary?"黑白二值化 · 阈值 "+threshold:"黑白黄红四色")+" · 简化："+(block==1?"原始细节":block+"×"+block+" 色块")+" · 抖动："+(dither?"开启":"关闭")+" · "+(cropped?"已手动裁切 · ":"")+"旋转 "+rotation+"° · "+(cover?"填满":"留白");
+        String settings="屏幕："+(panelType.isEmpty()?"尚未选择":panelType)+" · "+(binary?"黑白二值化 · 阈值 "+threshold:"黑白黄红四色")+" · 简化："+(block==1?"原始细节":block+"×"+block+" 色块")+" · 抖动："+(dither?"开启":"关闭")+(!binary?" · 灰阶保护："+(protectGrays?"开启":"关闭"):"")+" · "+(cropped?"已手动裁切 · ":"")+"旋转 "+rotation+"° · "+(cover?"填满":"留白");
         return new Prepared(image,packed,settings,panelType);
     }
 }

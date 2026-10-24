@@ -35,6 +35,9 @@ public final class QPollWorker {
     private static volatile String qtagRejection;
     private static volatile boolean qDiscoverySent,qDiscoveryAccepted;
     private static String mode;
+    private static StController st;
+    private static boolean stReleased;
+    private static final boolean stReaderChild="1".equals(System.getenv("QP_ST_READER"));
     private static final Binder callbackBinder = new Binder() {
         @Override protected boolean onTransact(int code, Parcel data, Parcel reply, int flags)
                 throws RemoteException {
@@ -80,8 +83,13 @@ public final class QPollWorker {
     private static void reader(int flags) throws Exception {
         Bundle extras=new Bundle();
         if("refresh".equals(mode)||"identity".equals(mode))extras.putInt("presence",5000);
-        invoke("setReaderMode", new Class<?>[]{IBinder.class, Class.forName("android.nfc.IAppCallback"),
-                int.class, Bundle.class, String.class}, token, callback, flags, extras, android.os.Process.myUid()==2000?"com.android.shell":"android");
+        Class<?> type=Class.forName("android.nfc.IAppCallback");
+        try {
+            invoke("setReaderMode", new Class<?>[]{IBinder.class, type, int.class, Bundle.class, String.class},
+                    token, callback, flags, extras, android.os.Process.myUid()==2000?"com.android.shell":"android");
+        } catch (NoSuchMethodException older) {
+            invoke("setReaderMode", new Class<?>[]{IBinder.class, type, int.class, Bundle.class}, token, callback, flags, extras);
+        }
     }
     private static int qtag(int action) throws Exception {
         return (Integer) invoke("sendVendorNciMessage", new Class<?>[]{int.class,int.class,int.class,byte[].class},
@@ -154,10 +162,23 @@ public final class QPollWorker {
                 emit(status == 0 ? "QTAG_OFF" : "CLEANUP_ERROR", "关闭 QTag，API 状态=" + status);
             } catch (Exception e) { emit("CLEANUP_ERROR", "关闭 QTag 失败：" + e); }
         }
+        if (st != null) {
+            try { st.close(); stReleased=true; }
+            catch (Exception e) { emit("RESTORE_FAILED", "ST 恢复失败，快照保留；请先重新执行检查 NFC："+e); }
+        }
         SystemClock.sleep(150);
         if (logcat != null) logcat.destroy();
     }
     public static void main(String[] args) {
+        if (StController.configured()&&!stReaderChild) {
+            android.os.Looper.prepareMainLooper();
+            try { StController.prepareFramework(); }
+            catch(Exception e) { emit("ERROR","ST framework 初始化失败："+e);e.printStackTrace();System.exit(1);return; }
+            new Thread(()->{run(args);System.exit(0);}, "st-nfc-worker").start();
+            android.os.Looper.loop();
+        } else {run(args);System.exit(0);}
+    }
+    private static void run(String[] args) {
         int exit = 0;
         boolean sessionStarted = false;
         try {
@@ -171,21 +192,50 @@ public final class QPollWorker {
             File stopFile = new File(args[2]);
             if (stopFile.exists()) { emit("END", "已取消，未启动寻卡"); return; }
             // App creates this private file before invoking root; no global writable lock path.
-            try (RandomAccessFile lockFile = new RandomAccessFile(args[3], "rw"); FileLock lock = lockFile.getChannel().tryLock()) {
+            String lockPath=StController.configured()&&!stReaderChild?"/data/local/tmp/qp-st-session.lock":args[3];
+            try (RandomAccessFile lockFile = new RandomAccessFile(lockPath, "rw"); FileLock lock = lockFile.getChannel().tryLock()) {
                 if (lock == null) throw new IllegalStateException("另一轮测试正在运行");
                 try {
                 init();
+                boolean stDevice=StController.configured()&&!stReaderChild;
+                if(stDevice){st=new StController(QPollWorker::emit);Runtime.getRuntime().addShutdownHook(new Thread(QPollWorker::cleanup));}
                 if (args[0].equals("inspect")) {
                     emit("CHIP",ChipInfo.inspect());
+                    if(stDevice){st.inspect();emit("END","ST 检查完成，未启用 7A 或激活兼容");return;}
                     adapterType.getMethod("sendVendorNciMessage", int.class, int.class, int.class, byte[].class);
                     emit("READY", "NXP 测试入口存在，可开始测试（尚未验证空口能力）");
                     emit("END", "权限检查完成，未发送寻卡命令"); return;
                 }
                 if (stopFile.exists()) { emit("END", "已取消，未启动寻卡"); return; }
+                if(stReaderChild&&mode.equals("refresh"))StReaderProcess.validateRefreshJob(new File(args[4]));
+                if(stDevice){
+                    if(args.length!=5)throw new IllegalArgumentException("ST 后端需要前台应用 ReaderMode；后台 Shell 在此系统上不生效");
+                    byte[] settingsBytes=java.nio.file.Files.readAllBytes(new File(args[4]).toPath());
+                    if(settingsBytes.length>8192)throw new IllegalArgumentException("会话配置过大");
+                    org.json.JSONObject settings=new org.json.JSONObject(new String(settingsBytes,"UTF-8"));
+                    if(!settings.optBoolean("foregroundReader",false))throw new IllegalArgumentException("请在前台应用启动 ST 寻卡或刷图");
+                    File readerDone=new File(settings.getString("readerDone")).getCanonicalFile();
+                    File appFiles=new File("/data/user/0/org.nfcresearch.qpolllab/files").getCanonicalFile();
+                    if(!readerDone.getParentFile().equals(appFiles)||!readerDone.getName().startsWith("reader-done-"))throw new IllegalArgumentException("前台结束标记路径错误");
+                    if(mode.equals("refresh"))StReaderProcess.validateRefreshJob(new File(args[4]));
+                    if(!mode.equals("standard")){
+                        st.preflight();
+                        st.installCompatibility(System.getenv("CLASSPATH"));
+                        if(stopFile.exists()){emit("END","已取消，未设置 7A");return;}
+                        st.enable();
+                    }
+                    emit("APP_READER_READY",mode+":"+seconds);
+                    long frontendDeadline=SystemClock.elapsedRealtime()+300000;
+                    while(!stopFile.exists()&&SystemClock.elapsedRealtime()<frontendDeadline)SystemClock.sleep(100);
+                    long cleanupDeadline=SystemClock.elapsedRealtime()+10000;
+                    while(!readerDone.exists()&&SystemClock.elapsedRealtime()<cleanupDeadline)SystemClock.sleep(100);
+                    if(!readerDone.exists())emit("ERROR","前台会话结束未确认；停止本轮并恢复轮询");
+                    return;
+                }
                 setupCallback();
                 Runtime.getRuntime().addShutdownHook(new Thread(QPollWorker::cleanup));
                 startLogcat();
-                if (args[0].equals("qtag")||panelOperation) {
+                if (!stReaderChild&&(args[0].equals("qtag")||panelOperation)) {
                     qtagTouched = true;
                     int status = qtag(1);
                     emit("QTAG_ON", "启用 QTag，API 状态=" + status + "（只是主机状态）");
@@ -198,7 +248,7 @@ public final class QPollWorker {
                 long deadline = SystemClock.elapsedRealtime() + seconds * 1000L;
                 while (!stopping.get() && !stopFile.exists() && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(100);
                 if(qtagRejection!=null)throw new IllegalStateException(qtagRejection);
-                if((mode.equals("qtag")||panelOperation)&&!qDiscoveryAccepted)emit("CAPABILITY","尚未确认 Q-Poll：未获得 0x71 指令及成功响应的完整证据；请查看日志。");
+                if(!stReaderChild&&(mode.equals("qtag")||panelOperation)&&!qDiscoveryAccepted)emit("CAPABILITY","尚未确认 Q-Poll：未获得 0x71 指令及成功响应的完整证据；请查看日志。");
                 if (tagSeen.get()&&panelOperation) {
                     final int scanSeconds=seconds;
                     final File panelJob=new File(args[4]);
@@ -239,9 +289,9 @@ public final class QPollWorker {
             for(String line:trace.toString().split("\n"))emit("TRACE",line.trim());
         } finally {
             cleanup();
-            if (readerTouched || qtagTouched) {
-                boolean ok = (!readerTouched || readerReleased) && (!qtagTouched || qtagDisabled);
-                emit(ok ? "RESTORED" : "RESTORE_FAILED", ok ? "已恢复普通寻卡" : "恢复未确认，请重启 NFC 开关后再试");
+            if (readerTouched || qtagTouched || st != null) {
+                boolean ok = (!readerTouched || readerReleased) && (!qtagTouched || qtagDisabled) && (st == null || stReleased);
+                if(!stReaderChild||!ok)emit(ok ? "RESTORED" : "RESTORE_FAILED", ok ? "已恢复普通寻卡" : "恢复未确认，请重启 NFC 开关后再试");
                 if (!ok) exit = 2;
             }
             if (sessionStarted || exit != 0) emit("END", "本轮结束");

@@ -4,6 +4,9 @@ package org.nfcresearch.qpolllab;
 public final class ImageBlocks {
     private ImageBlocks() { }
     public static byte[] quantize(int[] pixels,int width,int height,int block,int[] palette) {
+        return quantize(pixels,width,height,block,palette,false);
+    }
+    public static byte[] quantize(int[] pixels,int width,int height,int block,int[] palette,boolean protectGrays) {
         if(width<=0||height<=0||(long)width*height!=pixels.length||palette.length!=4)
             throw new IllegalArgumentException("Invalid image or palette");
         if(block!=1&&block!=2&&block!=4&&block!=8&&block!=16)
@@ -17,7 +20,8 @@ public final class ImageBlocks {
             }
             float r=sr/(float)count,g=sg/(float)count,b=sb/(float)count;
             int best=0;float score=Float.MAX_VALUE;
-            for(int k=0;k<4;k++) {
+            int colors=protectGrays&&ImageRaster.isNeutral(r,g,b)?2:4;
+            for(int k=0;k<colors;k++) {
                 float dr=r-((palette[k]>>>16)&255),dg=g-((palette[k]>>>8)&255),db=b-(palette[k]&255);
                 float distance=dr*dr+dg*dg+db*db;
                 if(distance<score){score=distance;best=k;}

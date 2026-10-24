@@ -1,0 +1,10 @@
+Protocol definitions, D1 parsing, four-colour panel encoding, and D3 packet layout are adapted from:
+https://gitee.com/kur0neko/huawei-epd-pn532
+Required Notice: Copyright (c) 2026 kur0neko
+PolyForm Noncommercial 1.0.0
+https://polyformproject.org/licenses/noncommercial/1.0.0/
+
+The bundled Android arm64 frida-inject executable is from Frida 17.24.0:
+https://github.com/frida/frida/releases/tag/17.24.0
+Its SHA-256 is 261875c11ec37fa1d3c26c05f71c0390ef1176539b0545d0b253cdbf24ece0e5.
+Frida is distributed under the wxWindows Library Licence; see FRIDA-COPYING.txt.

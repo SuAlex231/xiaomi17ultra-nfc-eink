@@ -39,7 +39,7 @@ public final class ShellBridge extends Binder {
   try{
    if(cancelled)mark.createNewFile();JSONObject settings=new JSONObject(json);if(bytes.length>0)settings.put("imageFile",image.toString());
    try(FileOutputStream out=new FileOutputStream(image)){out.write(bytes);}try(FileOutputStream out=new FileOutputStream(job)){out.write(settings.toString().getBytes("UTF-8"));}
-   java.util.ArrayList<String> command=new java.util.ArrayList<>();java.util.Collections.addAll(command,"/system/bin/app_process","/system/bin","org.nfcresearch.qpolllab.QPollWorker",mode,""+seconds,mark.toString(),new File(dir,"session.lock").toString());if(mode.equals("identity")||mode.equals("refresh"))command.add(job.toString());
+   java.util.ArrayList<String> command=new java.util.ArrayList<>();java.util.Collections.addAll(command,"/system/bin/app_process","/system/bin","org.nfcresearch.qpolllab.QPollWorker",mode,""+seconds,mark.toString(),new File(dir,"session.lock").toString());if(mode.equals("identity")||mode.equals("refresh")||settings.optBoolean("foregroundReader",false))command.add(job.toString());
    ProcessBuilder builder=new ProcessBuilder(command).redirectErrorStream(true);builder.environment().put("CLASSPATH",apk);child=builder.start();final java.lang.Process running=child;
    Thread deadline=new Thread(()->{try{if(!running.waitFor(320,TimeUnit.SECONDS)){mark.createNewFile();if(!running.waitFor(10,TimeUnit.SECONDS))running.destroy();}}catch(Exception ignored){}});deadline.setDaemon(true);deadline.start();
    try(BufferedReader in=new BufferedReader(new InputStreamReader(child.getInputStream(),"UTF-8"))){String line;while((line=in.readLine())!=null)log(line);}
