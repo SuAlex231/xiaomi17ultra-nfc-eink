@@ -2,7 +2,7 @@
 
 基于 [ZhaoGY-N/huawei-nfc-eink-android-app](https://github.com/ZhaoGY-N/huawei-nfc-eink-android-app) 的 Android 应用，增加小米 17 Ultra 的 ST54L 适配、系统相册选图和四色效果预览。
 
-当前版本：**2.15-shizuku-test1（实验预发布）**。
+当前版本：**2.15-shizuku-test2（实验预发布）**。
 
 [下载安装包](https://github.com/SuAlex231/xiaomi17ultra-nfc-eink/releases) · [小米 17 Ultra 适配说明](XIAOMI17U.md) · [第三方许可与来源](THIRD_PARTY_NOTICES.md)
 
@@ -44,6 +44,8 @@
 4. 需试刷时，按实体选择 A0/A1，选图、确认预览后手动发送。读不到标签时不会发送屏幕指令。轮询设置成功不等于读屏或刷写成功。
 
 Shell 与应用通过 Binder 同步结束状态，不要求 Shell 读取应用私有文件；Root / Shell 共用会话互斥锁，分别保存轮询快照，结束后恢复并读回。Shell 模式不会调用 su 或注入器，也不会自动转入 Root。
+
+test2 在 Shell 的“测试 ST 7A 寻卡”请求前台后 500ms 短暂停顿轮询并再次读回配置，记录 `ST_POST_READER_CONFIG`。同时记录 ST HAL 的自定义轮询激活通知 `ST_RF_ACTIVATION`，本轮结束记录 `ST_RF_EVIDENCE`。未收到激活通知不等于没有发射 7A；配置读回也不等于空口帧证明。这项复查仅用于寻卡诊断，不在只读屏幕或刷图过程中暂停通信。
 
 ### Root 兼容流程
 

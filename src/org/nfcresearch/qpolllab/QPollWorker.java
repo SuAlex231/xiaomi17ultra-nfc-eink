@@ -238,11 +238,16 @@ public final class QPollWorker {
                         st.enable();
                     }
                     emit("APP_READER_READY",mode+":"+seconds);
+                    if(android.os.Process.myUid()==2000&&mode.equals("qtag")){
+                        SystemClock.sleep(500);
+                        if(!stopFile.exists())st.inspectAfterReaderRequest();
+                    }
                     long frontendDeadline=SystemClock.elapsedRealtime()+300000;
                     while(!stopFile.exists()&&SystemClock.elapsedRealtime()<frontendDeadline)SystemClock.sleep(100);
                     long cleanupDeadline=SystemClock.elapsedRealtime()+10000;
                     while(!readerDone.exists()&&SystemClock.elapsedRealtime()<cleanupDeadline)SystemClock.sleep(100);
                     if(!readerDone.exists())emit("ERROR","前台会话结束未确认；停止本轮并恢复轮询");
+                    if(!mode.equals("standard"))st.pollingEvidence();
                     return;
                 }
                 setupCallback();

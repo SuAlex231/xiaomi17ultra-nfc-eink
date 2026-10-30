@@ -55,7 +55,7 @@ public final class MainActivity extends Activity {
     private TextView chipInfo,capabilityInfo;
     private android.app.Dialog previewDialog;
     private volatile android.os.IBinder bridgeBinder;
-    private final Shizuku.UserServiceArgs bridgeArgs=new Shizuku.UserServiceArgs(new android.content.ComponentName("org.nfcresearch.qpolllab","org.nfcresearch.qpolllab.ShellBridge")).tag("nfc-shell").version(21).daemon(false).processNameSuffix("nfc_shell");
+    private final Shizuku.UserServiceArgs bridgeArgs=new Shizuku.UserServiceArgs(new android.content.ComponentName("org.nfcresearch.qpolllab","org.nfcresearch.qpolllab.ShellBridge")).tag("nfc-shell").version(22).daemon(false).processNameSuffix("nfc_shell");
     private final android.content.ServiceConnection bridgeConnection=new android.content.ServiceConnection(){
         public void onServiceConnected(android.content.ComponentName name,android.os.IBinder binder){bridgeBinder=binder;try{append("Shizuku 后端已连接；实际 UID="+Shizuku.getUid()+"（2000=Shell，0=Root）。");}catch(Exception e){append("Shizuku 后端已连接，身份查询失败："+e);}}
         public void onServiceDisconnected(android.content.ComponentName name){bridgeBinder=null;append("Shizuku 后端已断开。");if(busy)requestStop("授权服务断开");}
@@ -299,6 +299,7 @@ public final class MainActivity extends Activity {
         String[] p=line.split("\\|",3);if(p.length!=3)return;String kind=p[1],message=p[2];
         if(kind.equals("CHIP"))chipInfo.setText("芯片："+message);
         if(kind.equals("CAPABILITY"))capabilityInfo.setText(discoveryName()+"："+message);
+        if(kind.equals("ST_POST_READER_CONFIG")||kind.equals("ST_RF_ACTIVATION"))capabilityInfo.setText("ST 7A："+message);
         if(kind.equals("QTAG_REJECTED"))capabilityInfo.setText("Q-Poll："+message);
         if(kind.equals("APP_READER_READY")){if(foregroundSession!=null&&resumed)foregroundSession.start();else requestStop("前台已离开，取消读卡");append(kind+" · "+message);return;}
         if(failure.accept(kind,message)){terminal=true;scanning=false;main.removeCallbacks(tick);state.setText("需要检查");detail.setText(failure.message());append(kind+" · "+message);return;}

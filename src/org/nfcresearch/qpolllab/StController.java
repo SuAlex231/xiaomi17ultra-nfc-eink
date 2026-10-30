@@ -35,6 +35,7 @@ public final class StController implements AutoCloseable {
     private volatile int expected = -1;
     private volatile int expectedOid = 1;
     private boolean paused, registered;
+    private final java.util.concurrent.atomic.AtomicBoolean customActivationSeen=new java.util.concurrent.atomic.AtomicBoolean();
 
     public static boolean configured() {
         try {
@@ -73,10 +74,13 @@ public final class StController implements AutoCloseable {
         callbackClass=Class.forName(shell?"android.nfc.INfcVendorNciCallback":"android.nfc.NfcAdapter$NfcVendorNciCallback");
         final IBinder callbackBinder;
         if(shell){
-            Field field=Class.forName("android.nfc.INfcVendorNciCallback$Stub").getDeclaredField("TRANSACTION_onVendorResponseReceived");field.setAccessible(true);final int responseCode=field.getInt(null);
+            Class<?> stub=Class.forName("android.nfc.INfcVendorNciCallback$Stub");
+            Field field=stub.getDeclaredField("TRANSACTION_onVendorResponseReceived");field.setAccessible(true);final int responseCode=field.getInt(null);
+            field=stub.getDeclaredField("TRANSACTION_onVendorNotificationReceived");field.setAccessible(true);final int notificationCode=field.getInt(null);
             callbackBinder=new Binder(){@Override protected boolean onTransact(int code,Parcel data,Parcel reply,int flags)throws RemoteException{
-                if(code!=responseCode)return super.onTransact(code,data,reply,flags);
-                data.enforceInterface("android.nfc.INfcVendorNciCallback");receive(data.readInt(),data.readInt(),data.createByteArray());
+                if(code!=responseCode&&code!=notificationCode)return super.onTransact(code,data,reply,flags);
+                data.enforceInterface("android.nfc.INfcVendorNciCallback");int gid=data.readInt(),oid=data.readInt();byte[] payload=data.createByteArray();
+                if(code==responseCode)receive(gid,oid,payload);else notification(gid,oid,payload);
                 if(reply!=null)reply.writeNoException();return true;
             }};
         }else callbackBinder=null;
@@ -86,6 +90,7 @@ public final class StController implements AutoCloseable {
             if (method.getName().equals("equals")) return proxy == args[0];
             if (method.getName().equals("toString")) return "QPollStCallback";
             if (method.getName().equals("onVendorNciResponse")) receive((Integer)args[0],(Integer)args[1],(byte[])args[2]);
+            if (method.getName().equals("onVendorNciNotification")) notification((Integer)args[0],(Integer)args[1],(byte[])args[2]);
             return null;
         });
         try {
@@ -96,6 +101,10 @@ public final class StController implements AutoCloseable {
         events.emit("BACKEND", "小米 17 Ultra / ST54L / "+(shell?"Shizuku Shell 实验":"Root")+"；实际 UID="+uid+"；未使用 NXP QTag 命令");
     }
     private void receive(int gid,int oid,byte[] data){if(gid==15&&oid==expectedOid&&data!=null&&data.length>0&&expected>=0&&(expectedOid==0x1e||(data[0]&255)==expected))replies.offer(data.clone());}
+    private void notification(int gid,int oid,byte[] data){
+        if(StPolling.customActivation(gid,oid,data)&&customActivationSeen.compareAndSet(false,true))
+            events.emit("ST_RF_ACTIVATION","收到 ST 自定义轮询激活通知（OID=01 / sub=14 / RF mode=78）；这证明发生自定义轮询激活，尚不等于 ISO-DEP 或刷写成功");
+    }
     private Object shellCall(String name,Class<?>[] types,Object... args)throws Exception{
         try{return shellAdapterClass.getMethod(name,types).invoke(shellAdapter,args);}
         catch(InvocationTargetException e){if(e.getCause() instanceof Exception)throw (Exception)e.getCause();throw e;}
@@ -184,6 +193,16 @@ public final class StController implements AutoCloseable {
             events.emit("CAPABILITY", "ST 7A 配置接受并读回一致；等待目标标签，尚未证明刷新成功");
         } finally { resume(); }
     }
+    /** Diagnostic for qtag only: no APDUs can be in progress in that mode. */
+    public void inspectAfterReaderRequest() throws Exception {
+        pause();
+        try{
+            byte[] active=read();boolean matches=Arrays.equals(active,StPolling.wakeup());
+            events.emit("ST_POST_READER_CONFIG", "请求前台后 500ms 复查="+PanelProtocol.toHex(active)+"；7A "+(matches?"仍保留":"已改变")+"；本次查询短暂停顿轮询，参数读回不等于空口帧证明");
+            if(!matches)throw new IOException("请求前台后 7A 配置已改变；停止本轮并恢复原值，不自动重写或刷图");
+        }finally{resume();}
+    }
+    public void pollingEvidence(){events.emit("ST_RF_EVIDENCE",customActivationSeen.get()?"本轮观察到 ST 自定义轮询激活通知":"本轮未观察到 ST 自定义轮询激活通知；不能仅凭配置读回证明空口发出了 7A");}
 
     public void installCompatibility(String apkPath) throws Exception {
         if(shell)throw new SecurityException("Shizuku Shell 实验路径禁止注入 NFC 服务");

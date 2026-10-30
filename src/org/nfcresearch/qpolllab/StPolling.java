@@ -20,6 +20,10 @@ public final class StPolling {
     public static boolean supportedDevice(String device, int sdk) {
         return knownDevice(device) && (sdk == 36 || sdk == 37);
     }
+    /** HAL vendor 0x14 carries the original RF activation; byte 4 is its RF technology mode. */
+    public static boolean customActivation(int gid,int oid,byte[] payload){
+        return gid==15&&oid==1&&payload!=null&&payload.length>=5&&(payload[0]&255)==0x14&&(payload[4]&255)==0x78;
+    }
     /** Native GET includes the CRC bytes which the OEM SET wrapper adds itself. */
     public static byte[] toHost(byte[] nativeFrames) {
         validate(nativeFrames);

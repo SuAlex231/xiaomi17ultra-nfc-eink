@@ -61,6 +61,10 @@ Shell 不读取应用私有文件：桥接服务复制任务到仅 Shell 可访�
 
 已验证生产后端在 UID 2000 下的查询、7A 设置及读回、跳过注入和模拟前台结束后的原轮询逐字节恢复；自动化校验新增会话结束标记的路径边界。实际 Shizuku 服务连接、标签通信和完整刷写由用户手动试用，未声称成功。
 
+### test2 诊断边界
+
+Shell 的 qtag 模式请求前台后 500ms 再暂停/查询/恢复，以排查 ReaderMode 启动时的配置覆盖；只读屏幕与刷图模式不增加这次暂停。实机确认前台启动后的配置仍为 7A。控制器 `0x14` 自定义轮询激活通知按原始 RF mode `0x78` 单独记录，不打印通知中的 UID。未观察到该通知不视为没有发射自定义帧，参数读回也不作为空口证明。该版本仍跳过 MIFARE 注入，不声称已解决墨水屏激活。
+
 ## 来源
 
 - 主要 Android 上游：[ZhaoGY-N/huawei-nfc-eink-android-app](https://github.com/ZhaoGY-N/huawei-nfc-eink-android-app)，基于提交 `f16adae`，保留其 Git 历史。
