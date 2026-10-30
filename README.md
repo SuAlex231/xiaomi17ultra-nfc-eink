@@ -2,7 +2,7 @@
 
 基于 [ZhaoGY-N/huawei-nfc-eink-android-app](https://github.com/ZhaoGY-N/huawei-nfc-eink-android-app) 的 Android 应用，增加小米 17 Ultra 的 ST54L 适配、系统相册选图和四色效果预览。
 
-当前版本：**2.14-android17-test1（预发布）**。
+当前版本：**2.15-shizuku-test1（实验预发布）**。
 
 [下载安装包](https://github.com/SuAlex231/xiaomi17ultra-nfc-eink/releases) · [小米 17 Ultra 适配说明](XIAOMI17U.md) · [第三方许可与来源](THIRD_PARTY_NOTICES.md)
 
@@ -13,12 +13,12 @@
 | 手机 | 小米 17 Ultra，25128PNA1C / nezha |
 | 已测试系统 | Android 16 / HyperOS OS3.0.312.0.WPACNXM：A1 实屏刷新；Android 17 / HyperOS OS4.0.5.0.XPACNXM：ST 检查、7A 设置、前台 ReaderMode 及轮询恢复 |
 | NFC 控制器 | ST54L |
-| 授权 | Root，或以 Root 运行的 Sui / Shizuku |
+| 授权 | Root 兼容流程保留；新增 Shizuku Shell 实验流程（跳过 MIFARE 注入，读屏与刷写未验证） |
 | 实体屏幕 | 华为 552×768 四色 A1，已完成实屏刷新并由使用者确认 |
 | A0 | 保留上游编码与自动化测试；本适配没有实体 A0 验证记录 |
 | 其他手机/系统 | 未验证，不能仅凭手机品牌或芯片名称推断兼容 |
 
-普通 Shell 在本机已验证能读写 ST 7A 轮询配置，但不注入系统 NFC 时尚未读到目标标签，**完整 Shizuku 免 Root 刷写仍不支持**；现有 ST 刷写继续使用 Root 兼容流程。详见[免 Root 可行性实测](SHIZUKU_RESEARCH.md)。NXP 手机沿用上游 Q-Poll 路线，本适配未增加 NXP 真机验证记录。
+2.15 按用户要求接入 **Shizuku Shell 手动试用流程**：配置 ST 7A，由前台应用接收标签并在收到标签后执行所选的只读检查或刷图，跳过 MIFARE 注入。先前无注入探针未读到标签，**本版不承诺免 Root 读屏或刷写成功**。Root 兼容流程继续保留。详见[免 Root 可行性实测](SHIZUKU_RESEARCH.md)。NXP 手机沿用上游 Q-Poll 路线，本适配未增加 NXP 真机验证记录。
 
 2.13 仅匹配 Android 16（SDK 36），升级 Android 17 后会误入 NXP Q-Poll 路径，可能出现 `Checking UID 0 but Package Name is Null`。2.14 接入 SDK 37，并在该机型的系统或 ST 配置不匹配时停止，避免回退到 NXP。Android 17 尚未验证标签通信与实体刷新。
 
@@ -35,6 +35,17 @@
 - 保留板内驱动，不改写 DB/DA，不调整 APC 或射频校准；协议失败后停止，不自动重发 D4。
 
 ## 使用
+
+### Shizuku Shell 实验流程
+
+1. 通过无线调试 / ADB 启动 Shizuku，并开启小米“USB 调试（安全设置）”。
+2. 选择“Shizuku · 实验”，点击“Shizuku 授权 / 连接”，核对日志实际 UID 为 **2000**。UID 0 表示服务实际为 Root，不算免 Root 验证；该选项仍会跳过 MIFARE 注入。
+3. 先“检查芯片 / NFC”，再“测试 ST 7A 寻卡”。若能读到标签，再做“只读检查屏幕”。
+4. 需试刷时，按实体选择 A0/A1，选图、确认预览后手动发送。读不到标签时不会发送屏幕指令。轮询设置成功不等于读屏或刷写成功。
+
+Shell 与应用通过 Binder 同步结束状态，不要求 Shell 读取应用私有文件；Root / Shell 共用会话互斥锁，分别保存轮询快照，结束后恢复并读回。Shell 模式不会调用 su 或注入器，也不会自动转入 Root。
+
+### Root 兼容流程
 
 1. 安装 Release 中的 APK，开启 NFC 并解锁手机。在应用中授权 Root，或连接 Root 模式的 Sui/Shizuku。
 2. 先检查芯片/NFC，再运行 ST 7A 寻卡。让手机 NFC 感应区与墨水屏线圈稳定贴合。

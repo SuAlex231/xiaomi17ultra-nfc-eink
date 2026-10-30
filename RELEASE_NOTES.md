@@ -1,25 +1,28 @@
-# 2.14-android17-test1
+# 2.15-shizuku-test1
 
-修复小米 17 Ultra 升级 Android 17 后，2.13 未进入 ST54L 后端的问题。
+按用户要求增加 Shizuku Shell 实验流程，先跳过 MIFARE 注入，供手动试用。**尚未验证免 Root 读屏或完整刷写成功。**
 
-## 修复内容
+## 本次更新
 
-- 接入 nezha / Android 17（SDK 37）的 ST 后端，保留 Android 16（SDK 36）。
-- 避免误入 NXP Q-Poll，继续由前台应用自身身份启用和释放 ReaderMode，处理此前的 `Checking UID 0 but Package Name is Null` 错误路径。
-- 已知 nezha 设备在系统版本或 ST 配置不匹配时停止，禁止回退到 NXP 厂商指令。
-- 设备页与芯片检查显示实际 Android / SDK 版本。
-- 保留相册选图、编辑裁剪、四色转换和效果预览。
+- 接入 UID 2000 的 ST 厂商回调、7A 轮询查询/设置与读回恢复，前台应用接收标签并执行所选通信流程。
+- 选择 Shizuku 时跳过 MIFARE 注入；不调用 su，不自动回退 Root。服务实际 UID 会显示在日志中，UID 0 不算免 Root 验证。
+- 通过 Binder 同步前台 ReaderMode 结束状态，避免 Shell 访问应用私有目录；新增会话结束标记路径校验。
+- Root / Shell 共用互斥锁，分别保存轮询快照；Root 选项继续保留原兼容注入。
+- 相册、编辑裁剪、四色转换和发送前确认保持可用。
 
-## 验证范围
+## 如何试用
 
-Android 17 / HyperOS OS4.0.5.0.XPACNXM / ST54L 已完成厂商回调、轮询查询和 5 秒 7A 寻卡流程检查：7A 设置读回一致，前台 ReaderMode 正常释放，原轮询恢复后逐字节读回一致。
+1. 通过无线调试 / ADB 启动 Shizuku，开启小米“USB 调试（安全设置）”。
+2. 在应用选择“Shizuku · 实验”，点击“Shizuku 授权 / 连接”，核对日志实际 UID 为 2000。
+3. 先“检查芯片 / NFC”，再“测试 ST 7A 寻卡”。能读到标签后再做“只读检查屏幕”。
+4. 如需试刷，按实物选择 A0/A1，选图并确认预览后手动发送。未读到标签不会发送图像，失败不自动重发刷新指令。
 
-本轮未收到标签，未发送屏幕 APDU 或图像，不代表 Android 17 下的标签通信与实体刷新已验证。此前 Android 16 的实体 A1 刷图记录保留。协议、图像处理及 Android 16/17 识别回归通过。
+Root 启动的 Sui/Shizuku 会显示 UID 0，不能据此证明免 Root。可切回 Root 选项使用原兼容流程。
 
-## 使用
+## 验证边界
 
-安装本版，保持手机解锁，在设备页选择 Root，先点击“检查芯片 / NFC”，界面应显示“ST 7A”。再进行寻卡与屏幕检查。D1 不能区分 A0/A1，请按实物选择。
+已在 Android 17 / HyperOS OS4.0.5.0.XPACNXM 的降权 UID 2000 / SELinux shell 进程验证生产后端查询、7A 设置读回、跳过注入和原轮询恢复；手机端任务校验及新增结束标记路径校验通过，现有协议和图像回归通过。
 
-应用没有网络权限。APK 与已发布版本沿用同一本地开发签名，提供 SHA-256 校验文件。Root / Root 模式 Sui 仍为 ST 后端要求，普通 Shell Shizuku 不足以替代。
+先前无注入探针在 30 秒内未收到标签，同位置 Root 兼容模式收到 IsoDep / NfcA 标签。本版加入的是可供尝试的完整应用路径，实际 Shizuku 连接、读屏和刷写由用户手动测试，不承诺成功。
 
-第三方来源与非商业条款见仓库 THIRD_PARTY_NOTICES.md 及 APK assets/licenses/。未改动屏幕驱动或射频校准，不自动重发刷新指令。
+APK 与已发布版本使用同一开发签名，提供 SHA-256 文件。无网络权限，第三方来源及非商业条款见 THIRD_PARTY_NOTICES.md 与 APK assets/licenses/。

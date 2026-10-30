@@ -9,6 +9,16 @@ import org.json.JSONObject;
 
 /** Root retains ST configuration; Shell owns ReaderMode and the ISO-DEP session. */
 public final class StReaderProcess {
+    public static File validateReaderDone(File job,JSONObject settings)throws Exception {
+        File done=new File(settings.getString("readerDone")).getCanonicalFile();
+        if(settings.optBoolean("bridgeForeground",false)){
+            if(!done.getParentFile().equals(job.getCanonicalFile().getParentFile())||!done.getName().equals("reader-done"))throw new IllegalArgumentException("Shizuku 前台结束标记路径错误");
+        }else{
+            File appFiles=new File("/data/user/0/org.nfcresearch.qpolllab/files").getCanonicalFile();
+            if(!done.getParentFile().equals(appFiles)||!done.getName().startsWith("reader-done-"))throw new IllegalArgumentException("前台结束标记路径错误");
+        }
+        return done;
+    }
     private static String quote(String s){return "'"+s.replace("'","'\\''")+"'";}
     public static void validateRefreshJob(File file)throws Exception {
         JSONObject settings=new JSONObject(new String(read(file,8192),"UTF-8"));

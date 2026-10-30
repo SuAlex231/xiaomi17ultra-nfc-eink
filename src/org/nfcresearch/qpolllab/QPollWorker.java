@@ -169,6 +169,17 @@ public final class QPollWorker {
         SystemClock.sleep(150);
         if (logcat != null) logcat.destroy();
     }
+    private static RandomAccessFile openSessionLock(String path)throws Exception {
+        RandomAccessFile file=new RandomAccessFile(path,"rw");
+        try{
+            if(path.equals("/data/local/tmp/qp-st-session-v2.lock")){
+                int uid=android.os.Process.myUid();
+                if(uid==0){android.system.Os.chown(path,0,2000);android.system.Os.chmod(path,0660);}
+                else if(uid==2000&&android.system.Os.stat(path).st_uid==2000)android.system.Os.chmod(path,0660);
+            }
+            return file;
+        }catch(Exception e){file.close();throw e;}
+    }
     public static void main(String[] args) {
         if (StController.configured()&&!stReaderChild) {
             android.os.Looper.prepareMainLooper();
@@ -191,9 +202,9 @@ public final class QPollWorker {
             if (seconds < 1 || seconds > 60) throw new IllegalArgumentException("时长超出当前模式允许范围");
             File stopFile = new File(args[2]);
             if (stopFile.exists()) { emit("END", "已取消，未启动寻卡"); return; }
-            // App creates this private file before invoking root; no global writable lock path.
-            String lockPath=StController.configured()&&!stReaderChild?"/data/local/tmp/qp-st-session.lock":args[3];
-            try (RandomAccessFile lockFile = new RandomAccessFile(lockPath, "rw"); FileLock lock = lockFile.getChannel().tryLock()) {
+            // ST root and shell share an advisory lock accessible only to root/shell (0660).
+            String lockPath=StController.configured()&&!stReaderChild?"/data/local/tmp/qp-st-session-v2.lock":args[3];
+            try (RandomAccessFile lockFile = openSessionLock(lockPath); FileLock lock = lockFile.getChannel().tryLock()) {
                 if (lock == null) throw new IllegalStateException("另一轮测试正在运行");
                 try {
                 if(StPolling.knownDevice(android.os.Build.DEVICE)&&!StController.configured())
@@ -216,13 +227,13 @@ public final class QPollWorker {
                     if(settingsBytes.length>8192)throw new IllegalArgumentException("会话配置过大");
                     org.json.JSONObject settings=new org.json.JSONObject(new String(settingsBytes,"UTF-8"));
                     if(!settings.optBoolean("foregroundReader",false))throw new IllegalArgumentException("请在前台应用启动 ST 寻卡或刷图");
-                    File readerDone=new File(settings.getString("readerDone")).getCanonicalFile();
-                    File appFiles=new File("/data/user/0/org.nfcresearch.qpolllab/files").getCanonicalFile();
-                    if(!readerDone.getParentFile().equals(appFiles)||!readerDone.getName().startsWith("reader-done-"))throw new IllegalArgumentException("前台结束标记路径错误");
+                    File readerDone=StReaderProcess.validateReaderDone(new File(args[4]),settings);
                     if(mode.equals("refresh"))StReaderProcess.validateRefreshJob(new File(args[4]));
                     if(!mode.equals("standard")){
                         st.preflight();
-                        st.installCompatibility(System.getenv("CLASSPATH"));
+                        if(android.os.Process.myUid()==2000||settings.optBoolean("skipMifareCompatibility",false))
+                            emit("ST_COMPAT_SKIPPED","实验路径：跳过 MIFARE 注入；实际 UID="+android.os.Process.myUid()+"；标签通信与刷写未验证");
+                        else st.installCompatibility(System.getenv("CLASSPATH"));
                         if(stopFile.exists()){emit("END","已取消，未设置 7A");return;}
                         st.enable();
                     }

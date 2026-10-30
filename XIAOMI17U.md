@@ -53,6 +53,14 @@ Android 13+ 使用系统 Photo Picker，旧系统回退到相册 ACTION_PICK。�
 
 已在 Android 17 / HyperOS OS4.0.5.0.XPACNXM 验证 ST54L 配置、厂商回调和轮询查询，以及 5 秒 7A 寻卡的设置读回、前台 ReaderMode 释放与原轮询逐字节恢复。本轮未收到标签，不发送屏幕 APDU 或图像；Android 17 下的实体刷新仍待验证。Android 16 的既有 A1 实屏验证记录保留。
 
+## 2.15 Shizuku Shell 实验流程
+
+按用户要求接入 UID 2000 的 ST 厂商 Binder 回调、轮询查询/设置与恢复，前台应用继续负责 ReaderMode 和 ISO-DEP。选择 Shizuku 时明确跳过 MIFARE 注入，包括服务实际以 Root 运行的情况；UID 0 不计为免 Root 验证。Root 选项保留原兼容注入。
+
+Shell 不读取应用私有文件：桥接服务复制任务到仅 Shell 可访问的会话目录，通过 Binder 接收应用已释放 ReaderMode 的通知，再恢复轮询。结束标记限定在该会话目录且名称固定。Root 与 Shell 共用 0660 会话锁，分别保存 0600 轮询快照；Shell 发现未恢复的 Root 快照时停止，提示先由 Root 恢复。
+
+已验证生产后端在 UID 2000 下的查询、7A 设置及读回、跳过注入和模拟前台结束后的原轮询逐字节恢复；自动化校验新增会话结束标记的路径边界。实际 Shizuku 服务连接、标签通信和完整刷写由用户手动试用，未声称成功。
+
 ## 来源
 
 - 主要 Android 上游：[ZhaoGY-N/huawei-nfc-eink-android-app](https://github.com/ZhaoGY-N/huawei-nfc-eink-android-app)，基于提交 `f16adae`，保留其 Git 历史。

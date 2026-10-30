@@ -27,7 +27,15 @@ public final class AndroidStJobTest {
             job.put("sha256","00");check(file,job,false);job.put("sha256",hash);
             job.put("imageFile",outside.toString());check(file,job,false);job.put("imageFile",image.toString());
             write(image,new byte[10]);check(file,job,false);
+            JSONObject foreground=new JSONObject();foreground.put("bridgeForeground",true);foreground.put("readerDone",new File(dir,"reader-done").toString());
+            if(!StReaderProcess.validateReaderDone(file,foreground).equals(new File(dir,"reader-done").getCanonicalFile()))throw new AssertionError("bridge reader done mismatch");
+            for(File bad:new File[]{new File(dir,"wrong-name"),new File(dir.getParentFile(),"reader-done")}){
+                foreground.put("readerDone",bad.toString());try{StReaderProcess.validateReaderDone(file,foreground);throw new AssertionError("escaped bridge marker accepted");}catch(IllegalArgumentException expected){}
+            }
+            foreground.put("readerDone",new File(dir,"reader-done").toString());foreground.put("bridgeForeground",false);
+            try{StReaderProcess.validateReaderDone(file,foreground);throw new AssertionError("private app marker gate bypassed");}catch(IllegalArgumentException expected){}
             System.out.println("PASS ST refresh job gates: A0/A1, confirmation, unknown type, timing, hash, path, size; NO NFC operations");
+            System.out.println("PASS Shizuku completion marker: session-local path, exact name, traversal and private app path gates; NO NFC operations");
         }finally{file.delete();image.delete();outside.delete();dir.delete();}
     }
 }
