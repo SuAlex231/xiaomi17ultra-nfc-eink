@@ -18,7 +18,7 @@
 | A0 | 保留上游编码与自动化测试；本适配没有实体 A0 验证记录 |
 | 其他手机/系统 | 未验证，不能仅凭手机品牌或芯片名称推断兼容 |
 
-普通 Shell Shizuku 在本机上不能替代 Root 完成 ST 7A 配置。NXP 手机沿用上游 Q-Poll 路线，本适配未增加 NXP 真机验证记录。
+普通 Shell 在本机已验证能读写 ST 7A 轮询配置，但不注入系统 NFC 时尚未读到目标标签，**完整 Shizuku 免 Root 刷写仍不支持**；现有 ST 刷写继续使用 Root 兼容流程。详见[免 Root 可行性实测](SHIZUKU_RESEARCH.md)。NXP 手机沿用上游 Q-Poll 路线，本适配未增加 NXP 真机验证记录。
 
 2.13 仅匹配 Android 16（SDK 36），升级 Android 17 后会误入 NXP Q-Poll 路径，可能出现 `Checking UID 0 but Package Name is Null`。2.14 接入 SDK 37，并在该机型的系统或 ST 配置不匹配时停止，避免回退到 NXP。Android 17 尚未验证标签通信与实体刷新。
 
