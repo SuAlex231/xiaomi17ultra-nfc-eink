@@ -48,7 +48,7 @@ public final class StController implements AutoCloseable {
     }
     public StController(PanelSession.Events events) throws Exception {
         this.events = events;
-        if (!configured()) throw new IllegalStateException("ST 后端仅适用于已核对的 nezha / Android 16 / ST54L 配置");
+        if (!configured()) throw new IllegalStateException("ST 后端需要 nezha / Android 16–17 / ST54L 配置；不回退到 NXP 命令");
         if (android.os.Process.myUid() != 0) throw new SecurityException("小米 17 Ultra 的 ST54L 兼容后端需要 Root；Shell Shizuku 尚未验证");
         adapter = preparedAdapter;
         if (adapter == null || !adapter.isEnabled()) throw new IllegalStateException("请先开启 NFC");

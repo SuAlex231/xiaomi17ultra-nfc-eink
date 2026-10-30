@@ -45,6 +45,14 @@ Android 13+ 使用系统 Photo Picker，旧系统回退到相册 ACTION_PICK。�
 
 手机端使用内置测试图验证入口、调色、方向、镜像、裁剪拖动、对照、取消和应用后的 A1 发送预览。此轮不启动 NFC 或刷新实体屏幕。
 
+## 2.14 Android 17 识别修复
+
+2.13 使用 `nezha && SDK == 36` 选择 ST 后端。升级 Android 17（SDK 37）后，界面及进程误入 NXP 路径；Root 进程的 ReaderMode 调用被系统包名校验拒绝，停止时也会报告释放失败。
+
+2.14 增加 SDK 37，继续由前台应用自身身份启用和释放 ReaderMode。已知 nezha 设备在系统版本或 ST 固件配置不匹配时停止，不回退到 NXP 厂商指令。设备页与芯片检查显示实际 Android/SDK 版本。
+
+已在 Android 17 / HyperOS OS4.0.5.0.XPACNXM 验证 ST54L 配置、厂商回调和轮询查询，以及 5 秒 7A 寻卡的设置读回、前台 ReaderMode 释放与原轮询逐字节恢复。本轮未收到标签，不发送屏幕 APDU 或图像；Android 17 下的实体刷新仍待验证。Android 16 的既有 A1 实屏验证记录保留。
+
 ## 来源
 
 - 主要 Android 上游：[ZhaoGY-N/huawei-nfc-eink-android-app](https://github.com/ZhaoGY-N/huawei-nfc-eink-android-app)，基于提交 `f16adae`，保留其 Git 历史。

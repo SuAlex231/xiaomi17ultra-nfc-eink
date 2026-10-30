@@ -2,7 +2,7 @@
 
 基于 [ZhaoGY-N/huawei-nfc-eink-android-app](https://github.com/ZhaoGY-N/huawei-nfc-eink-android-app) 的 Android 应用，增加小米 17 Ultra 的 ST54L 适配、系统相册选图和四色效果预览。
 
-当前版本：**2.13-edit-test1（预发布）**。
+当前版本：**2.14-android17-test1（预发布）**。
 
 [下载安装包](https://github.com/SuAlex231/xiaomi17ultra-nfc-eink/releases) · [小米 17 Ultra 适配说明](XIAOMI17U.md) · [第三方许可与来源](THIRD_PARTY_NOTICES.md)
 
@@ -11,7 +11,7 @@
 | 项目 | 状态 |
 | --- | --- |
 | 手机 | 小米 17 Ultra，25128PNA1C / nezha |
-| 已测试系统 | Android 16 / HyperOS OS3.0.312.0.WPACNXM |
+| 已测试系统 | Android 16 / HyperOS OS3.0.312.0.WPACNXM：A1 实屏刷新；Android 17 / HyperOS OS4.0.5.0.XPACNXM：ST 检查、7A 设置、前台 ReaderMode 及轮询恢复 |
 | NFC 控制器 | ST54L |
 | 授权 | Root，或以 Root 运行的 Sui / Shizuku |
 | 实体屏幕 | 华为 552×768 四色 A1，已完成实屏刷新并由使用者确认 |
@@ -19,6 +19,8 @@
 | 其他手机/系统 | 未验证，不能仅凭手机品牌或芯片名称推断兼容 |
 
 普通 Shell Shizuku 在本机上不能替代 Root 完成 ST 7A 配置。NXP 手机沿用上游 Q-Poll 路线，本适配未增加 NXP 真机验证记录。
+
+2.13 仅匹配 Android 16（SDK 36），升级 Android 17 后会误入 NXP Q-Poll 路径，可能出现 `Checking UID 0 but Package Name is Null`。2.14 接入 SDK 37，并在该机型的系统或 ST 配置不匹配时停止，避免回退到 NXP。Android 17 尚未验证标签通信与实体刷新。
 
 ## 功能
 

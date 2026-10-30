@@ -17,8 +17,10 @@ public final class StPollingTest {
         invalid(null); invalid(new byte[0]); invalid(new byte[]{5}); invalid(new byte[]{1});
         invalid(new byte[]{1,0x2a,1,0}); invalid(new byte[]{1,0x2a,2,10}); invalid(new byte[]{0,1});
         check(StPolling.supportedDevice("nezha",36));
-        check(!StPolling.supportedDevice("nezha",35)); check(!StPolling.supportedDevice("nezha",37));
-        check(!StPolling.supportedDevice("pudding",36)); check(!StPolling.supportedDevice(null,36));
+        check(StPolling.supportedDevice("nezha",37));
+        check(!StPolling.supportedDevice("nezha",35)); check(!StPolling.supportedDevice("nezha",38));
+        check(StPolling.knownDevice("nezha"));check(!StPolling.knownDevice(null));
+        check(!StPolling.supportedDevice("pudding",36));check(!StPolling.supportedDevice("pudding",37)); check(!StPolling.supportedDevice(null,36));
         System.out.println("ST polling TLV and Xiaomi 17 Ultra profile tests passed");
     }
 }

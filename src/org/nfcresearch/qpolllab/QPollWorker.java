@@ -196,6 +196,8 @@ public final class QPollWorker {
             try (RandomAccessFile lockFile = new RandomAccessFile(lockPath, "rw"); FileLock lock = lockFile.getChannel().tryLock()) {
                 if (lock == null) throw new IllegalStateException("另一轮测试正在运行");
                 try {
+                if(StPolling.knownDevice(android.os.Build.DEVICE)&&!StController.configured())
+                    throw new IllegalStateException("小米 17 Ultra 的 ST 后端配置未匹配（Android "+android.os.Build.VERSION.RELEASE+" / SDK "+android.os.Build.VERSION.SDK_INT+"）；停止，不回退到 NXP Q-Poll");
                 init();
                 boolean stDevice=StController.configured()&&!stReaderChild;
                 if(stDevice){st=new StController(QPollWorker::emit);Runtime.getRuntime().addShutdownHook(new Thread(QPollWorker::cleanup));}

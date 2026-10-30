@@ -4,7 +4,7 @@ import java.util.regex.*;
 
 public final class ChipInfo {
     public static String inspect(){
-        if(StController.configured())return "ST54L / 小米 17 Ultra（nezha） / Android 16；依据活动 NFC 配置 st54l_fw.bin；Root 7A 实验后端";
+        if(StController.configured())return "ST54L / 小米 17 Ultra（nezha） / Android "+android.os.Build.VERSION.RELEASE+"（SDK "+android.os.Build.VERSION.SDK_INT+"）；依据活动 NFC 配置 st54l_fw.bin；Root 7A 实验后端";
         for(String path:new String[]{"/odm/etc/libnfc-nxp.conf","/vendor/etc/libnfc-nxp.conf"}){
             try(BufferedReader in=new BufferedReader(new FileReader(path))){String line;while((line=in.readLine())!=null){
                 if(line.trim().startsWith("#"))continue;

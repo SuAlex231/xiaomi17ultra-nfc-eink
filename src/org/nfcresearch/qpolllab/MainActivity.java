@@ -91,14 +91,14 @@ public final class MainActivity extends Activity {
         String[] names={"设备与测试","图像与发送","高级参数"};for(int i=0;i<3;i++){final int index=i;tabs[i]=button(names[i]);tabs[i].setTextSize(13);tabs[i].setOnClickListener(v->selectPage(index));nav.addView(tabs[i],weighted());}
         Shizuku.addRequestPermissionResultListener(permissionResult);
         LinearLayout page=pageBodies[0];section(page,"设备与 NFC");
-        page.addView(text(android.os.Build.MANUFACTURER+" · "+android.os.Build.MODEL+" / "+android.os.Build.DEVICE,14,0xff52635d));
+        page.addView(text(android.os.Build.MANUFACTURER+" · "+android.os.Build.MODEL+" / "+android.os.Build.DEVICE+"\nAndroid "+android.os.Build.VERSION.RELEASE+" · SDK "+android.os.Build.VERSION.SDK_INT,14,0xff52635d));
         chipInfo=text("芯片：尚未检查",15,0xff263e35);page.addView(chipInfo);
         capabilityInfo=text(discoveryName()+"：尚未测试",15,0xff263e35);page.addView(capabilityInfo);
         page.addView(text("芯片信息来自当前系统配置；能力以实际寻卡命令与控制器响应为准。",12,0xff68766e));
         section(page,"授权方式");RadioGroup backend=new RadioGroup(this);backend.setOrientation(RadioGroup.HORIZONTAL);
         RadioButton shizuku=new RadioButton(this);shizuku.setId(View.generateViewId());shizuku.setText("Shizuku · 免 Root");backend.addView(shizuku);idleControls.add(shizuku);
         useRoot=new RadioButton(this);useRoot.setId(View.generateViewId());useRoot.setText("Root");backend.addView(useRoot);idleControls.add(useRoot);page.addView(backend);backend.check(shizuku.getId());
-        if(StPolling.supportedDevice(android.os.Build.DEVICE,android.os.Build.VERSION.SDK_INT)){
+        if(StPolling.knownDevice(android.os.Build.DEVICE)){
             backend.check(useRoot.getId());
             page.addView(text("小米 17 Ultra · ST54L 实验适配：请选择 Root。7A 寻卡会临时处理 NFC 服务的 MIFARE 重选，可能影响当前 NFC 会话；结束后恢复轮询。",13,0xff68766e));
         }
@@ -107,8 +107,8 @@ public final class MainActivity extends Activity {
         page.addView(action("检查芯片 / NFC",v->start("inspect")));
         section(page,discoveryName()+" 能力测试");
         page.addView(text("测试会开启短时寻卡，不发送图像或刷新指令。",12,0xff68766e));
-        duration=spinner(new String[]{"寻卡 5 秒","寻卡 10 秒","寻卡 30 秒","寻卡 60 秒"});duration.setSelection(StPolling.supportedDevice(android.os.Build.DEVICE,android.os.Build.VERSION.SDK_INT)?3:1);page.addView(duration);
-        page.addView(action(StPolling.supportedDevice(android.os.Build.DEVICE,android.os.Build.VERSION.SDK_INT)?"测试 ST 7A 寻卡":"测试 Q-Poll 能力",v->start("qtag")));page.addView(action("普通 NFC-A 对照",v->start("standard")));
+        duration=spinner(new String[]{"寻卡 5 秒","寻卡 10 秒","寻卡 30 秒","寻卡 60 秒"});duration.setSelection(StPolling.knownDevice(android.os.Build.DEVICE)?3:1);page.addView(duration);
+        page.addView(action(StPolling.knownDevice(android.os.Build.DEVICE)?"测试 ST 7A 寻卡":"测试 Q-Poll 能力",v->start("qtag")));page.addView(action("普通 NFC-A 对照",v->start("standard")));
         page.addView(text("未读到标签不等于不支持 Q-Poll；成功寻卡也不代表墨水屏供电与刷新已验证。",12,0xff68766e));
         page=pageBodies[1];section(page,"图像与发送");
         page.addView(text("屏幕类型",14,0xff52635d));
@@ -252,6 +252,9 @@ public final class MainActivity extends Activity {
     private static String quote(String s){return "'"+s.replace("'","'\\''")+"'";}
     private void start(final String mode){
         if(busy||preparing||editingCrop||!resumed)return;
+        if(StPolling.knownDevice(android.os.Build.DEVICE)&&!StPolling.supportedDevice(android.os.Build.DEVICE,android.os.Build.VERSION.SDK_INT)){
+            state.setText("系统版本待适配");detail.setText("当前 Android "+android.os.Build.VERSION.RELEASE+" / SDK "+android.os.Build.VERSION.SDK_INT+" 尚未接入 ST 后端；已停止，不使用 NXP Q-Poll。");append(detail.getText().toString());return;
+        }
         final boolean rootMode=useRoot.isChecked();
         final boolean foreground=StPolling.supportedDevice(android.os.Build.DEVICE,android.os.Build.VERSION.SDK_INT)&&!mode.equals("inspect");
         if(StPolling.supportedDevice(android.os.Build.DEVICE,android.os.Build.VERSION.SDK_INT)&&!rootMode){try{if(!Shizuku.pingBinder()||Shizuku.getUid()!=0){append("ST54L 的 7A 配置需要 Root 或 Root 模式的 Sui/Shizuku。");return;}}catch(Exception e){append("需要 Root / Sui 授权："+e);return;}}
@@ -301,7 +304,7 @@ public final class MainActivity extends Activity {
         if(kind.equals("TAG")){scanning=false;main.removeCallbacks(tick);state.setText("收到标签");detail.setText(message);}
         if(kind.equals("STAGE")){scanning=false;main.removeCallbacks(tick);String[] s=message.split("\\|",2);state.setText(s.length==2?s[1]:message);detail.setText("当前贴合的墨水屏 · 保持贴合，不要切换应用。");}
         if(kind.equals("PROGRESS")){String[] f=message.split("\\|",3);int done=Integer.parseInt(f[0]),total=Integer.parseInt(f[1]);progress.setMax(total);progress.setProgress(done);detail.setText("已确认 "+done+" / "+total+" 包 · "+(100*done/total)+"% · 保持贴合");return;}
-        if(kind.equals("READY")){state.setText("检查通过");detail.setText("授权 / NFC 可用；这不代表 Q-Poll 已受支持。");terminal=true;}
+        if(kind.equals("READY")){state.setText("检查通过");detail.setText("授权 / NFC 可用；目标屏通信与刷新需单独确认。");terminal=true;}
         if(kind.equals("IDENTITY"))detail.setText(message);
         if(kind.equals("REFRESH_DONE")||kind.equals("REFRESH_UNCONFIRMED")){terminal=true;state.setText(kind.equals("REFRESH_DONE")?"刷新周期已结束 · 请看屏幕":"刷新结果待确认");detail.setText(message);}
         if(kind.equals("RESULT")){terminal=true;state.setText(message.startsWith("D1")?"屏幕规格校验通过":message.startsWith("已收到")?"寻卡完成":message.startsWith("用户")?"已停止":"未收到标签");detail.setText(message);}
@@ -314,7 +317,7 @@ public final class MainActivity extends Activity {
         log.setText(transcript.toString());
         try(FileWriter out=new FileWriter(new File(getFilesDir(),"latest.log"),true)){out.write(stamped);}catch(Exception ignored){}
     }
-    private String discoveryName(){return StPolling.supportedDevice(android.os.Build.DEVICE,android.os.Build.VERSION.SDK_INT)?"ST 7A":"Q-Poll";}
+    private String discoveryName(){return StPolling.knownDevice(android.os.Build.DEVICE)?"ST 7A":"Q-Poll";}
     private void runBridge(String mode,int seconds,File job,File image,File stop)throws Exception {
         android.os.IBinder binder=bridgeBinder;if(binder==null||!binder.isBinderAlive())throw new IOException("请先点击 Shizuku 授权 / 连接。");
         String json="{}";if(job.exists())json=new String(readFile(job),"UTF-8");byte[] bytes=image.exists()?readFile(image):new byte[0];

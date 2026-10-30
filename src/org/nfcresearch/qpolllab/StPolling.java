@@ -16,8 +16,9 @@ public final class StPolling {
         }
         if (offset != payload.length) throw new IllegalArgumentException("ST 轮询尾部数据异常");
     }
+    public static boolean knownDevice(String device) { return "nezha".equals(device); }
     public static boolean supportedDevice(String device, int sdk) {
-        return "nezha".equals(device) && sdk == 36;
+        return knownDevice(device) && (sdk == 36 || sdk == 37);
     }
     /** Native GET includes the CRC bytes which the OEM SET wrapper adds itself. */
     public static byte[] toHost(byte[] nativeFrames) {
